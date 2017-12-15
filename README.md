@@ -27,6 +27,8 @@ Summary of code file:
 	- Create database connection (I used TeamSQL)
 	- Create 2 database tables (videos, podcasts)
 	- Insert data using class definitions
+	- Query data to get counts of keywords
+	- Configure chart in Plotly
 
 At the end of the file processing, you should see:
 
