@@ -20,6 +20,8 @@ import plotly.graph_objs as go
 
 plotly.tools.set_credentials_file(username='amisbah13', api_key='oJRU1rD5N7353t52nvh5')
 
+## SETUP CACHE
+
 CACHE_FNAME = 'cache_file.json'
 DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S.%f"
 DEBUG = True
@@ -73,6 +75,7 @@ def get_html_from_url(url):
         set_in_cache(url, html)
     return html
 
+## CREATING FUNCTIONS FOR DATA EXTRACTION
 def extract_video_data(soup_list):
     video_data_list = []
 
@@ -102,6 +105,7 @@ def extract_pod_data(show_soup, p_list):
             print('Fetching from soup')
         p_list = []
         for show in p_shows:
+            ## 5 iframes to access podcast episode-specific HTML for the 5 podcast shows
             p_section = show.find_next('iframe')
 
             browser = webdriver.Chrome()
@@ -121,7 +125,7 @@ def extract_pod_data(show_soup, p_list):
                     break
             html = browser.execute_script("return document.body.innerHTML")
             iframe_soup = Soup(html,'html.parser')
-
+            ## Using beautiful soup to get HTML from iframes
             p_date = iframe_soup.find_all("div", class_ = "awp-playlist-item-right")
             p_title_text = []
             show_title = show.get_text()
@@ -134,17 +138,21 @@ def extract_pod_data(show_soup, p_list):
 
     return p_list
 
+# Invoking function for videos
 video_url = "https://www.vox.com/videos"
 v_html = get_html_from_url(video_url)
 v_soup = Soup(v_html, 'html.parser')
+
+# video_list is the main section of videos and video_tops is the 4 headliner (or most recent) videos
 video_list = v_soup.find_all('div',{'class':'c-entry-box--compact'})
 
 video_tops = v_soup.find_all('div',{'class':'l-hero'})
 
+# invoking extraction function
 main_videos = extract_video_data(video_list)
 headline_videos = extract_video_data(video_tops)
 
-
+# Repeating the same steps but for the more recent archived videos
 video_archives_url = "https://www.vox.com/videos/archives"
 v_archives_html = get_html_from_url(video_archives_url)
 v_archives_soup = Soup(v_archives_html, 'html.parser')
@@ -152,9 +160,10 @@ video_archive_list = v_archives_soup.find_all('div',{'class':'c-entry-box--compa
 
 archived_videos = extract_video_data(video_archive_list)
 
+# Adding all lists from the extract_video_data function into another list
 video_dict_list = [main_videos,headline_videos,archived_videos]
 
-
+# Invoking HTML scraping function and extraction function for podcasts
 p_list = []
 
 podcast_url = "https://www.vox.com/pages/podcasts"
@@ -164,6 +173,7 @@ p_shows = p_soup.find_all('h4')
 
 p_list = extract_pod_data(p_shows,p_list)
 
+# Creating class definition for Video objects
 class Video(object):
     def __init__(self,object):
         self.title = object[0]
@@ -185,11 +195,13 @@ class Video(object):
             'video_date':self.date
         }
 
+# Creating instances of Videos
 video_objects = []
 for eachlist in video_dict_list:
     for video in eachlist:
         video_objects.append(Video(video))
 
+# Creating class definition for Podcast objects
 class Podcast(object):
     def __init__(self,pod_list):
         self.showtitle = pod_list[0]
@@ -202,12 +214,13 @@ class Podcast(object):
             'pod_date':self.epdate
         }
 
-
+# Creating instances of Podcast objects
 pod_show_objects = []
 for eachlist in p_list:
     for each in eachlist:
         pod_show_objects.append(Podcast(each))
 
+# Setting up database connection
 def get_connection_and_cursor():
     try:
         if db_password != "":
@@ -225,6 +238,7 @@ def get_connection_and_cursor():
 
 conn, cur = get_connection_and_cursor()
 
+# Creating the two tables
 cur.execute("""CREATE TABLE IF NOT EXISTS videos (
     id SERIAL PRIMARY KEY,
     video_title VARCHAR(128),
@@ -242,6 +256,7 @@ cur.execute("""CREATE TABLE IF NOT EXISTS podcasts(
 
 conn.commit()
 
+# Inserting data into tables using objects
 for video in video_objects:
     cur.execute("""INSERT INTO videos (video_title,url,authors,video_date) VALUES (%(video_title)s,%(video_url)s,%(authors)s,%(video_date)s) ON CONFLICT DO NOTHING""", video.get_video_dict())
 
@@ -250,6 +265,7 @@ for pod in pod_show_objects:
 
 conn.commit()
 
+# Querying data for visualization
 cur.execute("""SELECT COUNT(*) FROM videos WHERE video_title ILIKE '%border%' """)
 border_videos = cur.fetchall()
 
@@ -281,7 +297,7 @@ music_videos = cur.fetchall()
 cur.execute("""SELECT COUNT(podcast_title) FROM podcasts WHERE podcast_title ILIKE '%music%' """)
 music_pods = cur.fetchall()
 
-
+# Configuring barchart
 trace1 = go.Bar(
     x = ["Border","Health","DC","Music"],
     y = [border_videos[0]['count'],health_videos[0]['count'],dc_videos[0]['count'],music_videos[0]['count']],
